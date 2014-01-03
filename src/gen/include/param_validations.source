@@ -1,0 +1,86 @@
+-module(param_validations).
+
+-export([to_string/1, to_boolean/1, to_string_list/1, to_range/1]).
+
+-type input_string()  :: string() | binary().
+-type input_boolean() :: input_string() | boolean().
+-type input_int()     :: input_string() | integer().
+-type input_range()   :: input_string() | {input_int(), input_int()} |
+                         [input_int()].
+
+%%==============================================================================
+%% API
+%%==============================================================================
+-spec to_string(input_string() | atom()) -> string() | error.
+to_string(Input) when is_atom(Input) ->
+  atom_to_list(Input);
+to_string(Input) when is_binary(Input) ->
+  binary_to_list(Input);
+to_string(Input) when is_list(Input) ->
+  case io_lib:latin1_char_list(Input) of
+    true -> Input;
+    _    -> error
+  end;
+to_string(_) ->
+  error.
+
+-spec to_boolean(input_boolean()) -> boolean().
+to_boolean(Input) when is_binary(Input) ->
+  to_boolean(binary_to_list(Input));
+to_boolean(Input) when is_list(Input) ->
+  case string:to_lower(Input) of
+    "0"    -> false;
+    "1"    -> true;
+    "true" -> true;
+    _      -> false
+  end;
+to_boolean(1)    -> true;
+to_boolean(0)    -> false;
+to_boolean(true) -> true;
+to_boolean(_)    -> false.
+
+-spec to_string_list([input_string()] | string()) -> [string()] | error.
+to_string_list(Input) when is_binary(Input) ->
+  to_string_list(binary_to_list(Input));
+to_string_list(Input) when is_list(Input) ->
+  case io_lib:latin1_char_list(Input) of
+    true  -> string:tokens(Input, ",");
+    false -> R = [to_string(S) || S <- string:tokens(Input)],
+             case lists:all(fun(X) -> X =/= error end, R) of
+               true -> R;
+               _    -> error
+             end
+  end;
+to_string_list(_) ->
+  error.
+
+-spec to_int(input_int()) -> integer() | error.
+to_int(Input) when is_integer(Input) ->
+  Input;
+to_int(Input) ->
+  case to_string(Input) of
+    error -> error;
+    Any   -> list_to_integer(Any)
+  end. 
+
+-spec to_range(input_range()) -> {integer(), integer()} | error.
+to_range([A, B]) ->
+  to_range({A, B});
+to_range({A, B}) ->
+  case {to_int(A), to_int(B)} of
+    {_, error} -> error;
+    {error, _} -> error;
+    Any        -> Any
+  end;
+to_range(Input) when is_binary(Input) ->
+  to_range(binary_to_list(Input));
+to_range(Input) when is_list(Input) ->
+  case to_string(Input) of
+    error -> error;
+    Any   -> case string:tokens(Any, ";,") of
+               [A, B] -> to_range({A, B});
+               _      -> error
+             end
+  end;
+to_range(_) ->
+  error.

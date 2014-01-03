@@ -1,0 +1,77 @@
+#!/usr/bin/env escript
+
+main(Args) ->
+  case format_params(Args) of
+    error          -> io:format("Error reading parameters~n");
+    [{help, true}] -> print_help();
+    Params         -> %io:format("Params = ~p~n", [Params]),
+                      cover:compile_directory("src"),
+                      cover:compile_directory("src/gen"),
+                      cover:compile_directory("src/gen/include"),
+                      inets:start(),
+                      api_parser:init_with(Params),
+                      inets:stop()
+  end.
+
+format_params(L) ->
+  format_params(L, []).
+
+format_params([], Acc) ->
+  Acc;
+format_params([H | T], Acc) ->
+  case handle_param(get_param_by_name(H), T) of
+    {warn, Reason, L}  -> io:format("~p~n", [Reason]),
+                          format_params(L, Acc);
+    {error, Reason, _} -> io:format("~p~n", [Reason]),
+                          error;
+    {Param, Value, L}  -> format_params(L, [{Param, Value} | Acc])
+  end;
+format_params([H | T], Acc) ->
+  io:format("invalid param ~p~n", [H]),
+  format_params(T, Acc).
+
+get_param_by_name("-s")       -> source;
+get_param_by_name("-source")  -> source;
+get_param_by_name("-o")       -> output;
+get_param_by_name("-output")  -> output;
+get_param_by_name("-g")       -> generate;
+get_param_by_name("-q")       -> skip_examples;
+get_param_by_name("-h")       -> help;
+get_param_by_name("-help")    -> help;
+get_param_by_name([$- | T])   -> list_to_atom(T);
+get_param_by_name(Any)        -> {undef, Any}.
+
+handle_param({undef, Arg}, L)  -> {warn, "invalid argument " ++ Arg, L};
+handle_param(source, [])       -> {error, "source expected", []};
+handle_param(source, L)        -> handle_multi_param(source, L);
+handle_param(generate, [])     -> {error, "no code generator defined", []};
+handle_param(generate, L)      -> handle_multi_param(generate, L);
+handle_param(output, [])       -> {error, "source expected", []};
+handle_param(output, [H | T])  -> {output, H, T};
+handle_param(skip_examples, L) -> {skip_examples, true, L};
+handle_param(help, L)          -> {help, true, L};
+handle_param(Other, L)         -> handle_multi_param(Other, L).
+
+handle_multi_param(Name, L) ->
+  F = fun(P) ->
+        case get_param_by_name(P) of
+          {undef, _} -> true;
+          _          -> false
+        end
+      end,
+  {UnnamedParams, Rest} = lists:splitwith(F, L),
+
+  case length(UnnamedParams) of
+    0 -> {Name, true, Rest};
+    _ -> {Name, UnnamedParams, Rest}
+  end.
+
+print_help() ->
+  io:format("Command line options:~n"),
+  io:format("  -s: Specify the source files~n"),
+  io:format("  -o: The folder where the generated files will be placed~n"),
+  io:format("  -g: A list of source code builders, for example 'erl'~n"),
+  io:format("  -q: Skips the examples~n"),
+  io:format("  -v: Verbose mode~n"),
+  io:format("  -h: Show this text~n"),
+  ok.

@@ -1,0 +1,19 @@
+overview users "the API Endpoints listed in this \"page\" let users register and retrieve users"
+auth loggedin my_key my_secret # not displayed in the examples, in them, they will be replaced with KEY and SECRET in uppercase.
+
+GET /users "returns a list of the \"users\" matching a certain criteria"
+example "posting something" curl http://notadomain.com loggedin POST json "{\"a\":\"b\", \"c\":\"d\"}"
+example "retrieving something with auth" curl http://notadomain.com loggedin
+example "retrieving google homepage" curl http://www.google.com
+optional range age "narrows search to users of a given age"
+optional string_list locations "narrows search to a list of locations"
+200 "the user list was correctly retrieved"
+400 "the provided parameters are somehow incorrect"
+
+POST /user "creates a new user returning the created user token"
+required string email "the user's email, has to be unique"
+required string username "the username"
+optional string secondary_email "the password recovery email"
+201 "the username was correctly created"
+400 "the parameters are incorrect"
+409 "the username already exists"
